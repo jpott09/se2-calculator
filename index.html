@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#040607">
+<title>SE2 Build Planner</title>
+<meta name="description" content="Pick Space Engineers 2 blocks, get the components and ore needed to build them.">
+<link rel="icon" href="icons/i_SteelPlate.webp">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-view="blocks">
+<header class="top">
+  <span class="ribbon">ALPHA</span>
+  <svg class="top-art" aria-hidden="true" viewBox="0 0 420 64" preserveAspectRatio="xMaxYMax meet"><path d="M0 63.5H40L62 41.5H420"/><path d="M180 0L243.5 63.5M214 0L256 42"/></svg>
+  <div class="brand"><small>Space Engineers 2</small><h1>Build Planner</h1></div>
+  <button id="share" class="btn hot">Copy link</button>
+</header>
+
+<main class="layout">
+  <aside class="catalog">
+    <div class="cat-bar">
+      <div class="search"><input id="search" type="search" placeholder="Search blocks…" autocomplete="off" enterkeyhint="search"></div>
+      <nav id="cats" class="cats"></nav>
+      <p class="hint"><span class="for-mouse">Click +1 · Shift +10 · Ctrl +100 · Right‑click or − removes</span><span class="for-touch">Tap to add · tap − to remove · hold for recipe</span></p>
+    </div>
+    <div id="blocks" class="block-list"></div>
+  </aside>
+
+  <section class="plan">
+    <nav id="jump" class="jump" hidden>
+      <button data-to="p-build">List</button><button data-to="p-comp">Components</button><button data-to="p-bp">Backpack</button><button data-to="p-ore">Ore &amp; chain</button>
+    </nav>
+
+    <div class="panel" id="p-build">
+      <div class="panel-head">
+        <h2>Build list</h2>
+        <div class="panel-tools">
+          <div class="seg" role="radiogroup" aria-label="Components to count">
+            <label title="Everything needed for full integrity"><input type="radio" name="mode" id="allparts" checked><span>All parts</span></label>
+            <label title="Only the critical components needed to make blocks functional"><input type="radio" name="mode" id="functional"><span>Functional</span></label>
+          </div>
+          <button id="clear" class="btn">Clear</button>
+        </div>
+      </div>
+      <p id="summary" class="muted summary"></p>
+      <ul id="selection" class="selection"></ul>
+      <p id="empty" class="empty">Pick blocks from the catalog to start planning.</p>
+    </div>
+
+    <div id="results" class="results" hidden>
+      <div class="panel" id="p-comp">
+        <div class="panel-head"><h2>Components</h2><span class="muted">what you weld into the blocks</span></div>
+        <table id="t-comp" class="tbl"></table>
+        <p id="comp-foot" class="foot"></p>
+      </div>
+
+      <div class="panel" id="p-bp">
+        <div class="panel-head"><h2>Backpack welding</h2><span class="muted">hand welder crafts some components from ore</span></div>
+        <h3>Ore to carry</h3>
+        <table id="t-bp-ore" class="tbl"></table>
+        <p id="bp-note" class="foot"></p>
+        <div id="bp-groups"></div>
+      </div>
+
+      <div class="panel wide" id="p-ore">
+        <div class="panel-head"><h2>Raw ore &amp; production chain</h2><span class="muted">everything refined from ore</span></div>
+        <div id="ore-tiles" class="ore-tiles"></div>
+        <div id="steps" class="steps"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot-bar">
+  <span id="ver"></span>
+  <span>Fan-made, not affiliated with Keen Software House. Game data &amp; icons © Keen Software House.</span>
+</footer>
+
+<nav class="tabs" aria-label="View">
+  <button data-view="blocks">Blocks</button>
+  <button data-view="plan">Plan <b id="tab-count" class="count"></b></button>
+</nav>
+<div id="tip" class="tip" hidden></div>
+<script src="app.js"></script>
+</body>
+</html>
