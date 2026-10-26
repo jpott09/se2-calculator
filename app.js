@@ -16,6 +16,7 @@ const si = (n, u, big = ["M", "k"]) => {
 const draw = (n, u) => (u === "kW" ? si(n * 1000, "W") : `${fmt(n)} ${u}`);
 const energy = (s) => (s.u === "kWh" ? si(s.cap * 1000, "Wh") : `${fmt(s.cap)} ${s.u}`);
 const duration = (h) => (h < 1 ? `${fmt(Math.floor(h * 60))} min` : `${Math.floor(h)} h ${Math.floor((h % 1) * 60)} min`);
+const worksIn = (t) => (t.atm && t.vac ? "anywhere" : t.atm ? "atmosphere" : "vacuum");
 const tonnes = (kg) => `${fmt(kg >= 100e3 ? Math.round(kg / 1000) : kg / 1000)} t`;
 
 let D, blockById, recipeFor;
@@ -52,7 +53,8 @@ function init(data) {
   setView(sel.size ? "plan" : "blocks");
   $("#search").addEventListener("input", () => { renderCatalog(); catalogTop(); });
   $("#t-power").addEventListener("change", (e) => {
-    e.target.checked ? off.delete(e.target.value) : off.add(e.target.value);
+    const boxes = e.target.classList.contains("all") ? e.target.closest("table").querySelectorAll("tbody input") : [e.target];
+    for (const c of boxes) e.target.checked ? off.delete(c.value) : off.add(c.value);
     renderPower(); writeHash();
   });
   $("#power-need").addEventListener("change", (e) => {
@@ -68,9 +70,19 @@ function init(data) {
     encodeURIComponent(`Build: ${location.href}\n\nWhat's wrong:\n`)));
   document.querySelectorAll(".tabs button").forEach((b) => (b.onclick = () => setView(b.dataset.view)));
   document.querySelectorAll(".jump button").forEach((b) => (b.onclick = () => $("#" + b.dataset.to).scrollIntoView({ behavior: "smooth" })));
+  new ResizeObserver(layoutJump).observe($("#jump"));
   addEventListener("hashchange", () => { readHash(); renderCatalog(); render(); });
   addEventListener("pointerdown", (e) => { pointer = e.pointerType; hideTip(); }, true);
   addEventListener("scroll", hideTip, true);
+}
+
+// jump bar: as few rows as fit, buttons split evenly between them
+const JUMP_MIN = 92; // px a button needs for its label
+function layoutJump() {
+  const nav = $("#jump"), n = [...nav.children].filter((b) => !b.hidden).length;
+  if (!n || nav.hidden) return;
+  const rows = Math.ceil((n * JUMP_MIN) / nav.clientWidth);
+  nav.style.gridTemplateColumns = `repeat(${Math.ceil(n / rows)}, minmax(0, 1fr))`;
 }
 
 // ---------- phone views (Blocks / Plan tabs); each view keeps its own scroll position ----------
@@ -156,19 +168,10 @@ function buildGravity() {
 // ---------- catalog ----------
 function buildCats() {
   const cats = Object.entries(D.menu.cat).sort((a, b) => a[1].o - b[1].o || a[1].n.localeCompare(b[1].n));
-  const nav = $("#cats");
-  nav.innerHTML = "";
-  for (const [id, c] of [["all", { n: "All" }], ...cats]) {
-    const b = el("button", { className: "cat" + (id === cat ? " on" : ""), textContent: c.n });
-    b.dataset.cat = id;
-    // clicking the active category again goes back to All
-    b.onclick = () => {
-      cat = cat === id ? "all" : id;
-      nav.querySelectorAll(".cat").forEach((x) => x.classList.toggle("on", x.dataset.cat === cat));
-      renderCatalog(); catalogTop();
-    };
-    nav.append(b);
-  }
+  const pick = $("#cats");
+  for (const [id, c] of [["all", { n: "All categories" }], ...cats]) pick.append(el("option", { value: id, textContent: c.n }));
+  pick.value = cat;
+  pick.onchange = () => { cat = pick.value; renderCatalog(); catalogTop(); };
 }
 
 // back to the first block after the filter changes (list scrolls on its own when side by side, with the page on phones)
@@ -246,9 +249,8 @@ function powerTip(b) {
     (s ? row("Stores", `${energy(s)} ${s.r === "Electricity" ? "" : s.r.toLowerCase()}`) + row("Max output", draw(s.out, s.fu)) : "");
 }
 function thrustTip(t) {
-  const where = t.atm && t.vac ? "Atmosphere & vacuum" : t.atm ? "Atmosphere only" : "Vacuum only";
   const row = (k, v) => `<div class="tr"><span>${k}</span><b>${v}</b></div>`;
-  return row("Thrust", si(t.f, "N")) + row("Draw while firing", draw(t.d, t.u)) + row("Works in", where) +
+  return row("Thrust", si(t.f, "N")) + row("Draw while firing", draw(t.d, t.u)) + row("Works in", worksIn(t)) +
     (t.atm ? row("Lifts at 1 g", tonnes((t.f * t.atm) / G)) : "");
 }
 
@@ -313,81 +315,91 @@ function render() {
   machineGroups($("#steps"), r.steps, "st", "");
   renderThrust();
   renderPower();
+  layoutJump();
 }
 
-// electricity of one block, kW: draw at full tilt (thrusters firing, production running), max generation, battery
+// electricity of one block, kW: draw at full load (thrusters firing, production running), max generation, battery
 function powerOf(b) {
   const p = b.pw || {}, bat = b.st?.r === "Electricity" ? b.st : null;
   return { draw: (p.use || 0) + (p.work || 0) + (b.th?.u === "kW" ? b.th.d : 0), gen: p.gen || 0, bat };
 }
+const POWER_GROUPS = [["use", "Consumption"], ["gen", "Generation"], ["bat", "Batteries"]];
+const powerGroup = (p) => (p.bat ? "bat" : p.gen ? "gen" : p.draw ? "use" : null);
+
 function renderPower() {
-  const list = [...sel].filter(([id]) => { const p = powerOf(blockById[id]); return p.draw || p.gen || p.bat; });
-  $("#p-power").hidden = $("#jump-power").hidden = !list.length;
-  if (!list.length) return;
+  const groups = { use: [], gen: [], bat: [] };
+  for (const [id, q] of sel) {
+    const g = powerGroup(powerOf(blockById[id]));
+    if (g) groups[g].push([id, q]);
+  }
+  const any = Object.values(groups).some((g) => g.length);
+  $("#p-power").hidden = $("#jump-power").hidden = !any;
+  if (!any) return;
   const tot = { draw: 0, gen: 0, out: 0, cap: 0 };
   let variable = false;
-  $("#t-power").innerHTML = list.map(([id, q]) => {
-    const b = blockById[id], p = powerOf(b), on = !off.has(id), w = b.pw || {};
-    if (on) {
-      tot.draw += p.draw * q; tot.gen += p.gen * q;
-      if (p.bat) { tot.out += p.bat.out * q; tot.cap += p.bat.cap * q; }
-      variable ||= !!w.var;
-    }
-    const what = [w.use && `${draw(w.use, "kW")} always`, w.work && `${draw(w.work, "kW")} working`,
-      b.th?.u === "kW" && `${draw(b.th.d, "kW")} firing`, p.gen && `${w.var ? "up to " : ""}${draw(p.gen, "kW")} (${w.var || "fuel"})`,
-      p.bat && `${energy(p.bat)}, ${draw(p.bat.out, "kW")} out`].filter(Boolean).join(" · ");
-    const net = (p.gen + (p.bat ? p.bat.out : 0) - p.draw) * q;
-    return `<tr class="${on ? "" : "off"}"><td class="ck"><input type="checkbox" value="${id}" ${on ? "checked" : ""} aria-label="Count ${b.n}"></td>` +
-      `<td class="ic"><img src="icons/${b.i}.webp" alt=""></td><td class="nm">${b.n} ${b.s ? `<span class="size">${meters(b.s)}</span>` : ""}` +
-      `<div class="muted">${q} × ${what}</div></td><td class="n ${net < 0 ? "use" : "make"}">${net > 0 ? "+" : ""}${draw(net, "kW")}</td></tr>`;
+  $("#t-power").innerHTML = POWER_GROUPS.filter(([g]) => groups[g].length).map(([g, title]) => {
+    let sub = 0, on = 0;
+    const rows = groups[g].map(([id, q]) => {
+      const b = blockById[id], p = powerOf(b), w = b.pw || {}, ok = !off.has(id);
+      const val = g === "use" ? p.draw : g === "gen" ? p.gen : p.bat.out;
+      if (ok) {
+        on++; sub += val * q;
+        tot.draw += p.draw * q; tot.gen += p.gen * q;
+        if (p.bat) { tot.out += p.bat.out * q; tot.cap += p.bat.cap * q; }
+        variable ||= !!w.var;
+      }
+      const each = g === "bat" ? `${draw(p.bat.out, "kW")} · ${energy(p.bat)}` : `${draw(val, "kW")}${w.var ? ` max (${w.var})` : ""}`;
+      return `<tr class="${ok ? "" : "off"}"><td class="ck"><input type="checkbox" value="${id}" ${ok ? "checked" : ""} aria-label="Count ${b.n}"></td>` +
+        `<td class="ic"><img src="icons/${b.i}.webp" alt=""></td><td class="nm">${b.n} ${b.s ? `<span class="size">${meters(b.s)}</span>` : ""}` +
+        `<div class="muted">${q} × ${each}</div></td><td class="n">${draw(val * q, "kW")}</td></tr>`;
+    }).join("");
+    const all = on === groups[g].length;
+    return `<table class="tbl power" data-group="${g}"><thead><tr><td class="ck"><input type="checkbox" class="all" ${all ? "checked" : ""} ` +
+      `data-mixed="${on && !all ? 1 : ""}" aria-label="Count all ${title.toLowerCase()}"></td><th colspan="2">${title}</th>` +
+      `<td class="n ${g === "use" ? "use" : "make"}">${draw(sub, "kW")}</td></tr></thead><tbody>${rows}</tbody></table>`;
   }).join("");
-  const short = tot.draw - tot.gen;
-  const row = (k, v, cls = "") => `<tr><td class="nm">${k}</td><td class="n ${cls}">${v}</td></tr>`;
-  // raw kW on the totals for tools/test_site.py
-  $("#t-power-sum").innerHTML = row("Draw", `<span id="pw-draw" data-n="${tot.draw}">${draw(tot.draw, "kW")}</span>`) +
-    row(variable ? "Generation (max)" : "Generation", `<span id="pw-gen" data-n="${tot.gen}">${draw(tot.gen, "kW")}</span>`) +
-    row(short > 0 ? "Shortfall" : "Surplus", draw(Math.abs(short), "kW"), short > 0 ? "bad" : "");
-  $("#power-bat").textContent = short <= 0 ? (variable ? "Solar and wind only reach their max in full sun or strong wind." : "")
-    : !tot.out ? "No batteries counted."
-    : tot.out < short ? `Batteries can only give ${draw(tot.out, "kW")}, ${draw(short - tot.out, "kW")} short.`
-    : `Batteries last ${duration(tot.cap / short)} at this draw (${si(tot.cap * 1000, "Wh")} stored).`;
+  $("#t-power").querySelectorAll("[data-mixed='1']").forEach((c) => (c.indeterminate = true));
+
+  const net = tot.gen - tot.draw;
+  const bat = net >= 0 || !tot.out ? null : tot.out < -net ? [`${draw(-net - tot.out, "kW")} short`, "use"] : [`last ${duration(tot.cap / -net)}`, ""];
+  const row = (k, v, cls, id, n) => `<tr><td class="nm">${k}</td><td class="n ${cls}"${id ? ` id="${id}" data-n="${n}"` : ""}>${v}</td></tr>`;
+  // raw kW in data-n for tools/test_site.py
+  $("#t-power-sum").innerHTML = row("Draw", draw(tot.draw, "kW"), "use", "pw-draw", tot.draw) +
+    row(variable ? "Generation (max)" : "Generation", draw(tot.gen, "kW"), "make", "pw-gen", tot.gen) +
+    row(net >= 0 ? "Surplus" : "Shortfall", draw(Math.abs(net), "kW"), net >= 0 ? "make" : "use") +
+    (bat ? row("Batteries", bat[0], bat[1]) : "");
   // batteries of each size to cover the shortfall: enough output, and enough charge for runMin
   const need = $("#power-need");
-  need.hidden = short <= 0;
-  if (short <= 0) return;
+  need.hidden = net >= 0;
+  if (net >= 0) return;
   const focus = document.activeElement === need.querySelector("input");
-  need.innerHTML = `<span class="needs-l">Batteries to cover the shortfall for <input id="run-min" class="num" type="number" min="1" value="${runMin}" inputmode="numeric" aria-label="Minutes"> min, any one size</span>` +
+  need.innerHTML = `<span class="needs-l">Batteries needed for <input id="run-min" class="num" type="number" min="1" value="${runMin}" inputmode="numeric" aria-label="Minutes"> min</span>` +
     D.blocks.filter((b) => b.st?.r === "Electricity").map((b) => {
-      const n = Math.max(Math.ceil(short / b.st.out), Math.ceil((short * runMin) / 60 / b.st.cap));
-      return `<span class="chip"><img class="ii" src="icons/${b.i}.webp" alt="">${meters(b.s)}<b data-bat="${b.id}">${fmt(n)}</b></span>`;
+      const n = Math.max(Math.ceil(-net / b.st.out), Math.ceil((-net * runMin) / 60 / b.st.cap));
+      return `<span class="chip"><img class="ii" src="icons/${b.i}.webp" alt="">${meters(b.s)}<b>${fmt(n)}</b></span>`;
     }).join("");
   if (focus) need.querySelector("input").focus();
 }
 
-// lift if every listed thruster pushes the same way; draw is the full rate, which thrusters use at any throttle
+// lift = total thrust / gravity, as if every listed thruster faces down
 function renderThrust() {
   const list = [...sel].filter(([id]) => blockById[id].th);
   $("#p-thrust").hidden = $("#jump-thrust").hidden = !list.length;
   if (!list.length) return;
-  const f = { atm: 0, vac: 0 }, use = {};
+  const f = { atm: 0, vac: 0 };
   $("#t-thrust").innerHTML = list.map(([id, q]) => {
     const b = blockById[id], t = b.th;
     f.atm += t.f * t.atm * q;
     f.vac += t.f * t.vac * q;
-    addTo(use, t.u, t.d * q);
     return `<tr><td class="ic"><img src="icons/${b.i}.webp" alt=""></td><td class="nm">${b.n} ${b.s ? `<span class="size">${meters(b.s)}</span>` : ""}` +
-      `<div class="muted">${q} × ${si(t.f, "N")}</div></td><td class="n">${si(t.f * q, "N")}</td></tr>`;
+      `<div class="muted">${q} × ${si(t.f, "N")} · ${worksIn(t)}</div></td><td class="n">${si(t.f * q, "N")}</td></tr>`;
   }).join("");
-  const kg = [...sel].reduce((t, [id, q]) => t + blockById[id].kg * q, 0);
-  $("#thrust-sub").textContent = `${planetsAt(grav)} surface (${fmt(grav)} m/s²), if every listed thruster pushes the same way, e.g. only the ones facing down`;
+  $("#grav-where").textContent = `${planetsAt(grav)} · ${fmt(grav)} m/s²`;
   const row = (k, fn, attr = () => "") => `<tr><td class="nm">${k}</td>` +
     ["atm", "vac"].map((e) => `<td class="n"${attr(e)}>${fn(f[e])}</td>`).join("") + "</tr>";
-  const tw = (n) => { const r = n / (kg * grav); return `<span class="${r < 1 ? "bad" : ""}">${fmt(r)}</span>`; };
   // raw newtons on the thrust row for tools/test_site.py
-  $("#t-lift").innerHTML = row("Thrust", (n) => si(n, "N"), (e) => ` id="thrust-${e}" data-n="${f[e]}"`) + row("Lifts", (n) => tonnes(n / grav)) +
-    row("Cargo room", (n) => tonnes(Math.max(0, n / grav - kg))) + row("Thrust / weight", tw);
-  $("#thrust-foot").textContent = `Full burn: ${Object.entries(use).map(([u, n]) => draw(n, u) + (u === "L/s" ? " hydrogen" : "")).join(" + ")}. ` +
-    `Thrusters draw their full rate whenever firing, at any throttle. Weight = this list's ${tonnes(kg)} grid mass.`;
+  $("#t-lift").innerHTML = row("Thrust", (n) => si(n, "N"), (e) => ` id="thrust-${e}" data-n="${f[e]}"`) +
+    row("Lifts (all down)", (n) => tonnes(n / grav));
 }
 
 // split {item: n} by the machine that makes each item

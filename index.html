@@ -23,10 +23,13 @@
 <main class="layout">
   <aside class="catalog">
     <div class="cat-bar">
-      <div class="search"><input id="search" type="search" placeholder="Search blocks…" autocomplete="off" enterkeyhint="search"></div>
-      <nav id="cats" class="cats"></nav>
-      <p class="hint"><span class="for-mouse">Click +1 · Shift +10 · Ctrl +100 · Right‑click or − removes</span><span class="for-touch">Tap to add · tap − to remove · hold for recipe</span></p>
+      <div class="search">
+        <input id="search" type="search" placeholder="Search blocks…" autocomplete="off" enterkeyhint="search">
+        <select id="cats" class="pick" aria-label="Category"></select>
+      </div>
     </div>
+    <dl class="hint for-mouse"><dt>Click</dt><dd>add 1</dd><dt>Shift + click</dt><dd>add 10</dd><dt>Ctrl + click</dt><dd>add 100</dd><dt>Right-click or −</dt><dd>remove</dd></dl>
+    <dl class="hint for-touch"><dt>Tap</dt><dd>add 1</dd><dt>Tap −</dt><dd>remove 1</dd><dt>Hold</dt><dd>components</dd></dl>
     <div id="blocks" class="block-list"></div>
   </aside>
 
@@ -73,27 +76,22 @@
       </div>
 
       <div class="panel wide" id="p-thrust" hidden>
-        <div class="panel-head">
-          <h2>Thrust</h2>
-          <div id="grav" class="seg" role="radiogroup" aria-label="Gravity"></div>
-          <span id="thrust-sub" class="muted"></span>
-        </div>
+        <div class="panel-head"><h2>Thrust</h2></div>
         <div class="thrust">
           <table id="t-thrust" class="tbl"></table>
           <div>
+            <div class="grav"><span class="needs-l">Gravity</span><div id="grav" class="seg" role="radiogroup" aria-label="Gravity"></div><span id="grav-where" class="muted"></span></div>
             <table class="tbl lift"><thead><tr><td></td><th>Atmosphere</th><th>Vacuum</th></tr></thead><tbody id="t-lift"></tbody></table>
-            <p id="thrust-foot" class="foot"></p>
           </div>
         </div>
       </div>
 
       <div class="panel wide" id="p-power" hidden>
-        <div class="panel-head"><h2>Power</h2><span class="muted">everything checked running flat out at once, thrusters firing</span></div>
+        <div class="panel-head"><h2>Power</h2></div>
         <div class="thrust">
-          <table id="t-power" class="tbl power"></table>
+          <div id="t-power"></div>
           <div>
             <table class="tbl lift"><tbody id="t-power-sum"></tbody></table>
-            <p id="power-bat" class="foot"></p>
             <div id="power-need" class="needs" hidden></div>
           </div>
         </div>
