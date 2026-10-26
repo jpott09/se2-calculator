@@ -280,10 +280,11 @@ h3 { font-size: 0.78125rem; font-weight: 600; letter-spacing: .14em; text-transf
   .block-list h4:first-child { margin-top: 4px; }
   .grid { grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); }
   .plan { padding: 0 0 16px; }
-  .jump button { padding: 0 10px; font-size: 0.84375rem; }
+  .jump button { flex: 1 1 0; padding: 0 10px; font-size: 0.84375rem; }
   .jump { margin: 0; padding: 0 0 8px; gap: 6px; background: var(--bg); border: 0; backdrop-filter: none; }
   .panel { padding: 12px 14px; }
-  .selection { grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr)); }
+  /* same two-column cap; 368px = 380px minus panel padding, so it splits at the same width as .results */
+  .selection { grid-template-columns: repeat(auto-fit, minmax(min(100%, max(368px, calc(50% - 3px))), 1fr)); }
   /* two columns max: side by side once both fit at 380px, else stacked */
   .results { grid-template-columns: repeat(auto-fit, minmax(min(100%, max(380px, calc(50% - 6px))), 1fr)); }
   .ore-tiles { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
