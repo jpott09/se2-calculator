@@ -32,7 +32,7 @@
 
   <section class="plan">
     <nav id="jump" class="jump" hidden>
-      <button data-to="p-build">List</button><button data-to="p-comp">Components</button><button data-to="p-bp">Backpack</button><button data-to="p-thrust" id="jump-thrust">Thrust</button><button data-to="p-ore">Ore &amp; chain</button>
+      <button data-to="p-build">List</button><button data-to="p-comp">Components</button><button data-to="p-bp">Backpack</button><button data-to="p-ore">Ore &amp; chain</button><button data-to="p-thrust" id="jump-thrust">Thrust</button>
     </nav>
 
     <div class="panel" id="p-build">
@@ -66,6 +66,12 @@
         <div id="bp-groups"></div>
       </div>
 
+      <div class="panel wide" id="p-ore">
+        <div class="panel-head"><h2>Raw ore &amp; production chain</h2><span class="muted">everything refined from ore</span></div>
+        <div id="ore-tiles" class="ore-tiles"></div>
+        <div id="steps" class="steps"></div>
+      </div>
+
       <div class="panel wide" id="p-thrust" hidden>
         <div class="panel-head">
           <h2>Thrust</h2>
@@ -79,12 +85,6 @@
             <p id="thrust-foot" class="foot"></p>
           </div>
         </div>
-      </div>
-
-      <div class="panel wide" id="p-ore">
-        <div class="panel-head"><h2>Raw ore &amp; production chain</h2><span class="muted">everything refined from ore</span></div>
-        <div id="ore-tiles" class="ore-tiles"></div>
-        <div id="steps" class="steps"></div>
       </div>
     </div>
   </section>
