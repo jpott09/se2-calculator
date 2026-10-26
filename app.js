@@ -39,6 +39,9 @@ function init(data) {
   document.querySelectorAll("[name=mode]").forEach((r) => r.addEventListener("change", () => { render(); writeHash(); }));
   $("#clear").addEventListener("click", clearOrUndo);
   $("#share").addEventListener("click", share);
+  // prefill the issue with the current build so wrong numbers can be reproduced
+  $("#report").addEventListener("click", (e) => (e.currentTarget.href = "https://github.com/jpott09/se2-calculator/issues/new?body=" +
+    encodeURIComponent(`Build: ${location.href}\n\nWhat's wrong:\n`)));
   document.querySelectorAll(".tabs button").forEach((b) => (b.onclick = () => setView(b.dataset.view)));
   document.querySelectorAll(".jump button").forEach((b) => (b.onclick = () => $("#" + b.dataset.to).scrollIntoView({ behavior: "smooth" })));
   addEventListener("hashchange", () => { readHash(); renderCatalog(); render(); });
