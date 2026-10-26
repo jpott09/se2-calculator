@@ -73,7 +73,7 @@ function init(data) {
   document.querySelectorAll(".jump button").forEach((b) => (b.onclick = () => $("#" + b.dataset.to).scrollIntoView({ behavior: "smooth" })));
   new ResizeObserver(layoutJump).observe($("#jump"));
   addEventListener("hashchange", () => { readHash(); renderCatalog(); render(); });
-  addEventListener("pointerdown", (e) => { pointer = e.pointerType; hideTip(); }, true);
+  addEventListener("pointerdown", (e) => { pointer = e.pointerType; hideTip(); if (e.target !== $("#clear")) disarmClear(); }, true);
   addEventListener("scroll", hideTip, true);
 }
 
@@ -97,6 +97,7 @@ function setView(v) {
   scrollTo(0, viewScroll[v] || 0);
 }
 
+// Clear asks once ("Clear all?"), then offers Undo for a few seconds
 function clearOrUndo() {
   const btn = $("#clear");
   clearTimeout(btn.timer);
@@ -104,13 +105,27 @@ function clearOrUndo() {
     for (const [id, q] of undoClear) sel.set(id, q);
     undoClear = null;
     btn.textContent = "Clear";
+  } else if (!btn.classList.contains("armed")) {
+    btn.classList.add("armed");
+    btn.textContent = "Clear all?";
+    btn.timer = setTimeout(disarmClear, 4000);
+    return;
   } else {
+    btn.classList.remove("armed");
     undoClear = new Map(sel);
     sel.clear();
     btn.textContent = "Undo";
     btn.timer = setTimeout(() => { undoClear = null; btn.textContent = "Clear"; render(); }, 6000);
   }
   update();
+}
+
+function disarmClear() {
+  const btn = $("#clear");
+  if (!btn.classList.contains("armed")) return;
+  clearTimeout(btn.timer);
+  btn.classList.remove("armed");
+  btn.textContent = "Clear";
 }
 
 function share() {

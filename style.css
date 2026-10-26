@@ -59,6 +59,10 @@ h1, h2, h3, h4 { margin: 0; }
 .btn:hover:not(:disabled) { border-color: #8da0a6; }
 .btn.hot { border-color: var(--accent-b); }
 .btn:disabled { opacity: .4; cursor: default; }
+/* destructive: soft red until armed, then solid */
+.btn.warn { min-width: 6.5em; border-color: #8f4a3f; color: #ffb4a8; }
+.btn.warn:hover:not(:disabled) { border-color: #d96a57; }
+.btn.warn.armed { background: #b8412c; border-color: #ff7b6b; color: #fff; }
 /* the in-game settings tab: jump bar, bottom tabs */
 .jump button, .tabs button {
   border: 1px solid #4a5a60; border-radius: 3px; background: var(--glow), #07141a; color: #c9d3d6; cursor: pointer; white-space: nowrap;
