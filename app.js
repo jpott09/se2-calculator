@@ -51,7 +51,8 @@ function init(data) {
   renderCatalog();
   render();
   setView(sel.size ? "plan" : "blocks");
-  $("#search").addEventListener("input", () => { renderCatalog(); catalogTop(); });
+  // typing searches every category: the dropdown is for browsing
+  $("#search").addEventListener("input", () => { cat = $("#cats").value = "all"; renderCatalog(); catalogTop(); });
   $("#t-power").addEventListener("change", (e) => {
     const boxes = e.target.classList.contains("all") ? e.target.closest("table").querySelectorAll("tbody input") : [e.target];
     for (const c of boxes) e.target.checked ? off.delete(c.value) : off.add(c.value);
