@@ -150,7 +150,7 @@ body[data-view="plan"] .catalog, body[data-view="blocks"] .plan { display: none;
   margin: -12px -12px 0; padding: 8px 12px; background: rgba(4,6,7,.95); border-bottom: 1px solid #22292c; backdrop-filter: blur(6px);
 }
 .jump::-webkit-scrollbar { display: none; }
-.jump button { flex: 1 0 auto; height: 36px; padding: 0 7px; font-size: 0.78rem; }
+.jump button { flex: 1 0 auto; height: 36px; padding: 0 5px; font-size: 0.75rem; }
 .panel {
   background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 12px; min-width: 0; position: relative;
   scroll-margin-top: calc(var(--top-h) + 60px);
@@ -204,6 +204,11 @@ h3 { font-size: 0.78125rem; font-weight: 600; letter-spacing: .14em; text-transf
 .ore.total { grid-column: 1 / -1; border-color: var(--accent-b); }
 .ore.total > div { display: flex; flex-direction: row-reverse; align-items: baseline; justify-content: space-between; width: 100%; }
 .ore.total b { font-size: 1.5rem; color: var(--accent2); }
+.thrust { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 4px 18px; }
+.thrust .nm .muted { font-size: 0.75rem; }
+.lift th { font-size: 0.71875rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); text-align: right; padding: 0 4px 4px; }
+.lift tbody tr:first-child td { border-top: 1px solid var(--line3); }
+.bad { color: #ff7b6b; }
 #steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 4px 18px; }
 .mgroup { min-width: 0; }
 .needs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0 4px; padding: 8px; background: rgba(10,27,39,.45); border: 1px solid #22313b; border-radius: 3px; }

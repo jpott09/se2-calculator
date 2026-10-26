@@ -32,7 +32,7 @@
 
   <section class="plan">
     <nav id="jump" class="jump" hidden>
-      <button data-to="p-build">List</button><button data-to="p-comp">Components</button><button data-to="p-bp">Backpack</button><button data-to="p-ore">Ore &amp; chain</button>
+      <button data-to="p-build">List</button><button data-to="p-comp">Components</button><button data-to="p-bp">Backpack</button><button data-to="p-thrust" id="jump-thrust">Thrust</button><button data-to="p-ore">Ore &amp; chain</button>
     </nav>
 
     <div class="panel" id="p-build">
@@ -64,6 +64,21 @@
         <table id="t-bp-ore" class="tbl"></table>
         <p id="bp-note" class="foot"></p>
         <div id="bp-groups"></div>
+      </div>
+
+      <div class="panel wide" id="p-thrust" hidden>
+        <div class="panel-head">
+          <h2>Thrust</h2>
+          <div id="grav" class="seg" role="radiogroup" aria-label="Gravity"></div>
+          <span id="thrust-sub" class="muted"></span>
+        </div>
+        <div class="thrust">
+          <table id="t-thrust" class="tbl"></table>
+          <div>
+            <table class="tbl lift"><thead><tr><td></td><th>Atmosphere</th><th>Vacuum</th></tr></thead><tbody id="t-lift"></tbody></table>
+            <p id="thrust-foot" class="foot"></p>
+          </div>
+        </div>
       </div>
 
       <div class="panel wide" id="p-ore">

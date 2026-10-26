@@ -7,11 +7,21 @@ const ARROW_L = '<svg width="8" height="10" viewBox="0 0 8 10" aria-hidden="true
 const ARROW_R = '<svg width="8" height="10" viewBox="0 0 8 10" aria-hidden="true"><path d="M0 0v10l8-5z"/></svg>';
 const meters = (s) => (s ? `${s / 100} m` : "");
 const fmt = (n) => (Math.round(n * 100) / 100).toLocaleString();
+const G = 9.80665; // 1 g in m/s²
+// value with the largest unit it reaches, e.g. si(8950, "N") = "8.95 kN"
+const si = (n, u, big = ["M", "k"]) => {
+  for (const [p, x] of [[big[0], 1e6], [big[1], 1e3]]) if (Math.abs(n) >= x) return `${fmt(n / x)} ${p}${u}`;
+  return `${fmt(n)} ${u}`;
+};
+const draw = (n, u) => (u === "kW" ? si(n * 1000, "W") : `${fmt(n)} ${u}`);
+const tonnes = (kg) => `${fmt(kg >= 100e3 ? Math.round(kg / 1000) : kg / 1000)} t`;
 
 let D, blockById, recipeFor;
 const sel = new Map(); // block id -> qty
 const tiles = new Map(); // block id -> catalog tile element
 let cat = "all";
+let grav = null; // selected gravity in m/s²
+let planetsAt; // gravity -> "Byblos, Kemik, and Verdure"
 let pointer = "mouse"; // type of the last pointer used, to tell taps from mouse hovers
 let undoClear = null;
 
@@ -30,12 +40,14 @@ function init(data) {
     b.q = (b.n + " " + meters(b.s) + " " + b.k + " " + g.n + " " + s.n + " " + D.menu.cat[s.p].n).toLowerCase();
   }
   $("#ver").textContent = `Data: SE2 Steam build ${D.game.steamBuild} · v${D.game.dataVersion}`;
+  buildGravity();
   readHash();
   buildCats();
   renderCatalog();
   render();
   setView(sel.size ? "plan" : "blocks");
   $("#search").addEventListener("input", () => { renderCatalog(); catalogTop(); });
+  $("#grav").addEventListener("change", (e) => { grav = +e.target.value; render(); writeHash(); });
   document.querySelectorAll("[name=mode]").forEach((r) => r.addEventListener("change", () => { render(); writeHash(); }));
   $("#clear").addEventListener("click", clearOrUndo);
   $("#share").addEventListener("click", share);
@@ -92,12 +104,16 @@ function readHash() {
   }
   $("#functional").checked = p.get("f") === "1";
   $("#allparts").checked = !$("#functional").checked;
+  const g = $(`#grav input[value="${p.get("g")}"]`) || $("#grav input");
+  g.checked = true;
+  grav = +g.value;
 }
 function writeHash() {
   const b = [...sel].map(([id, q]) => `${id}:${q}`).join(",");
   const h = new URLSearchParams();
   if (b) h.set("b", b);
   if ($("#functional").checked) h.set("f", "1");
+  if (grav !== D.planets[0].g) h.set("g", grav);
   history.replaceState(null, "", h.toString() ? "#" + h.toString().replace(/%3A/g, ":").replace(/%2C/g, ",") : location.pathname);
 }
 function update() { writeHash(); refreshTiles(); render(); }
@@ -105,6 +121,18 @@ function add(id, n) {
   const q = Math.max(0, (sel.get(id) || 0) + n);
   q ? sel.set(id, q) : sel.delete(id);
   update();
+}
+
+// planets grouped by surface gravity, strongest first
+function buildGravity() {
+  const byG = new Map();
+  for (const p of D.planets) byG.set(p.g, [...(byG.get(p.g) || []), p.n]);
+  planetsAt = (g) => new Intl.ListFormat("en").format(byG.get(g));
+  for (const g of byG.keys()) {
+    const l = el("label", { title: `${planetsAt(g)} · ${fmt(g)} m/s²` });
+    l.innerHTML = `<input type="radio" name="grav" value="${g}"><span>${fmt(g / G)} g</span>`;
+    $("#grav").append(l);
+  }
 }
 
 // ---------- catalog ----------
@@ -190,7 +218,13 @@ function blockTip(b) {
   const total = { ...b.c };
   for (const [i, a] of Object.entries(b.o)) addTo(total, i, a);
   return `<div class="th">${b.n}${b.s ? ` <span class="size">${meters(b.s)}</span>` : ""}</div>` +
-    `<div class="tsub">${D.menu.grp[b.g].n} · ${fmt(b.kg)} kg</div>` + rows(total);
+    `<div class="tsub">${D.menu.grp[b.g].n} · ${fmt(b.kg)} kg</div>` + (b.th ? thrustTip(b.th) : "") + rows(total);
+}
+function thrustTip(t) {
+  const where = t.atm && t.vac ? "Atmosphere & vacuum" : t.atm ? "Atmosphere only" : "Vacuum only";
+  const row = (k, v) => `<div class="tr"><span>${k}</span><b>${v}</b></div>`;
+  return row("Thrust", si(t.f, "N")) + row("Draw while firing", draw(t.d, t.u)) + row("Works in", where) +
+    (t.atm ? row("Lifts at 1 g", tonnes((t.f * t.atm) / G)) : "") + `<div class="tsep">Components</div>`;
 }
 
 // ---------- calculation ----------
@@ -252,6 +286,33 @@ function render() {
     oreBox.append(el("div", { className: "ore", innerHTML: `${icon(i)}<div><b>${fmt(n)}</b><span>${D.items[i].n}</span></div>` }));
   }
   machineGroups($("#steps"), r.steps, "st", "");
+  renderThrust();
+}
+
+// lift if every listed thruster pushes the same way; draw is the full rate, which thrusters use at any throttle
+function renderThrust() {
+  const list = [...sel].filter(([id]) => blockById[id].th);
+  $("#p-thrust").hidden = $("#jump-thrust").hidden = !list.length;
+  if (!list.length) return;
+  const f = { atm: 0, vac: 0 }, use = {};
+  $("#t-thrust").innerHTML = list.map(([id, q]) => {
+    const b = blockById[id], t = b.th;
+    f.atm += t.f * t.atm * q;
+    f.vac += t.f * t.vac * q;
+    addTo(use, t.u, t.d * q);
+    return `<tr><td class="ic"><img src="icons/${b.i}.webp" alt=""></td><td class="nm">${b.n} ${b.s ? `<span class="size">${meters(b.s)}</span>` : ""}` +
+      `<div class="muted">${q} × ${si(t.f, "N")}</div></td><td class="n">${si(t.f * q, "N")}</td></tr>`;
+  }).join("");
+  const kg = [...sel].reduce((t, [id, q]) => t + blockById[id].kg * q, 0);
+  $("#thrust-sub").textContent = `${planetsAt(grav)} surface (${fmt(grav)} m/s²), if every listed thruster pushes the same way, e.g. only the ones facing down`;
+  const row = (k, fn, attr = () => "") => `<tr><td class="nm">${k}</td>` +
+    ["atm", "vac"].map((e) => `<td class="n"${attr(e)}>${fn(f[e])}</td>`).join("") + "</tr>";
+  const tw = (n) => { const r = n / (kg * grav); return `<span class="${r < 1 ? "bad" : ""}">${fmt(r)}</span>`; };
+  // raw newtons on the thrust row for tools/test_site.py
+  $("#t-lift").innerHTML = row("Thrust", (n) => si(n, "N"), (e) => ` id="thrust-${e}" data-n="${f[e]}"`) + row("Lifts", (n) => tonnes(n / grav)) +
+    row("Cargo room", (n) => tonnes(Math.max(0, n / grav - kg))) + row("Thrust / weight", tw);
+  $("#thrust-foot").textContent = `Full burn: ${Object.entries(use).map(([u, n]) => draw(n, u) + (u === "L/s" ? " hydrogen" : "")).join(" + ")}. ` +
+    `Thrusters draw their full rate whenever firing, at any throttle. Weight = this list's ${tonnes(kg)} grid mass.`;
 }
 
 // split {item: n} by the machine that makes each item
