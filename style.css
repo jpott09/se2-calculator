@@ -91,7 +91,10 @@ h1, h2, h3, h4 { margin: 0; }
 .brand { position: relative; min-width: 0; }
 .brand small { display: block; font-size: 0.625rem; font-weight: 600; letter-spacing: .22em; text-transform: uppercase; color: var(--muted); }
 h1 { font-size: 1.375rem; font-weight: 700; line-height: 1.1; white-space: nowrap; letter-spacing: -.01em; }
-.top .btn { position: relative; }
+.top-btns { position: relative; display: flex; gap: 8px; }
+/* blueprints live on a PC: hidden on phones (no room in the header either), shown with a mouse or a wide screen */
+#bp-open { display: none; }
+@media (hover: hover) and (pointer: fine), (min-width: 760px) { #bp-open { display: block; } }
 
 /* layout: one view at a time, switched by the bottom tabs */
 .layout { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; }
@@ -262,6 +265,34 @@ h3 { font-size: 0.78125rem; font-weight: 600; letter-spacing: .14em; text-transf
 .tr { display: flex; align-items: center; gap: 6px; font-size: 0.875rem; padding: 1px 0; }
 .tr span { flex: 1; }
 .tr b { font-weight: 600; }
+
+/* blueprint dialog */
+.dlg {
+  width: min(560px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); padding: 16px; color: var(--text);
+  background: #050b0e; border: 1px solid #56676c; border-radius: 4px; box-shadow: 0 12px 40px rgba(0,0,0,.8);
+}
+.dlg::backdrop { background: rgba(0,0,0,.6); }
+.dlg p { margin: 8px 0; }
+.bp-src { display: inline-flex; margin-top: 12px; }
+#bp-ws { margin: -4px 0 8px; }
+#bp-paths { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 6px 10px; margin: 12px 0; }
+.bp-path {
+  min-width: 0; min-height: var(--hit); padding: 6px 8px; background: var(--field); border: 1px solid #3c4c55; border-radius: 3px;
+  font: 0.8125rem/1.35 ui-monospace, monospace; text-align: left; overflow-wrap: anywhere; cursor: copy;
+}
+.bp-path:hover { border-color: var(--accent-b); }
+code { font-size: 0.875em; color: var(--accent2); }
+/* outcome of a blueprint load, above the build list */
+.load-note { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; padding: 6px 2px 6px 10px; border: 1px solid #3c4c55; border-radius: 3px; background: rgba(10,27,39,.45); }
+.load-note .lines { flex: 1; font-size: 0.875rem; }
+.load-note p { margin: 0; }
+.load-note p:first-child { font-weight: 600; }
+.load-note.warn { border-color: var(--accent-b); background: rgba(243,156,43,.08); }
+.load-note.bad { border-color: #d96a57; background: rgba(217,106,87,.1); color: #ffb4a8; }
+/* drop target while files are dragged over the page */
+.drop { position: fixed; inset: 8px; z-index: 30; display: grid; place-items: center; pointer-events: none;
+  border: 2px dashed var(--accent); border-radius: 6px; background: rgba(4,6,7,.8); font-size: 1.25rem; font-weight: 600; }
+.dlg-btns { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 14px; }
 
 /* fingers: bigger remove pill on picked tiles */
 @media (pointer: coarse) {

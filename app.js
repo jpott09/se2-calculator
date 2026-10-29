@@ -19,7 +19,7 @@ const duration = (h) => (h < 1 ? `${fmt(Math.floor(h * 60))} min` : `${Math.floo
 const worksIn = (t) => (t.atm && t.vac ? "anywhere" : t.atm ? "atmosphere" : "vacuum");
 const tonnes = (kg) => `${fmt(kg >= 100e3 ? Math.round(kg / 1000) : kg / 1000)} t`;
 
-let D, blockById, recipeFor;
+let D, blockById, blockByEntity, recipeFor;
 const sel = new Map(); // block id -> qty
 const tiles = new Map(); // block id -> catalog tile element
 let cat = "all";
@@ -37,6 +37,7 @@ fetch("data/se2.json").then((r) => r.json()).then(init).catch((e) => {
 function init(data) {
   D = data;
   blockById = Object.fromEntries(D.blocks.map((b) => [b.id, b]));
+  blockByEntity = new Map(D.blocks.map((b) => [guidBytes(b.e), b.id]));
   recipeFor = {};
   for (const r of D.recipes) for (const o in r.out) recipeFor[o] = r;
   for (const b of D.blocks) {
@@ -66,6 +67,7 @@ function init(data) {
   document.querySelectorAll("[name=mode]").forEach((r) => r.addEventListener("change", () => { render(); writeHash(); }));
   $("#clear").addEventListener("click", clearOrUndo);
   $("#share").addEventListener("click", share);
+  initBlueprints();
   // prefill the issue with the current build so wrong numbers can be reproduced
   $("#report").addEventListener("click", (e) => (e.currentTarget.href = "https://github.com/jpott09/se2-calculator/issues/new?body=" +
     encodeURIComponent(`Build: ${location.href}\n\nWhat's wrong:\n`)));
@@ -114,6 +116,7 @@ function clearOrUndo() {
     btn.classList.remove("armed");
     undoClear = new Map(sel);
     sel.clear();
+    loadNote(null);
     btn.textContent = "Undo";
     btn.timer = setTimeout(() => { undoClear = null; btn.textContent = "Clear"; render(); }, 6000);
   }
@@ -301,6 +304,145 @@ function compute() {
     else addTo(bpComp, i, n);
   }
   return { comps, ore, steps, bpOre, bpComp };
+}
+
+// ---------- blueprints (<blueprint folder>/grid.json.vrb), decoded in the browser ----------
+// subscribed Workshop items are in Steam's library (default location shown), one folder per item id
+const BP_PATHS = {
+  saved: [
+    ["Windows", "%APPDATA%\\SpaceEngineers2\\AppData\\Blueprints"],
+    ["Linux", "~/.steam/steam/steamapps/compatdata/1133870/pfx/drive_c/users/steamuser/AppData/Roaming/SpaceEngineers2/AppData/Blueprints"],
+  ],
+  workshop: [
+    ["Windows", "C:\\Program Files (x86)\\Steam\\steamapps\\workshop\\content\\1133870"],
+    ["Linux", "~/.steam/steam/steamapps/workshop/content/1133870"],
+  ],
+};
+function showPaths(src) {
+  $("#bp-paths").replaceChildren(...BP_PATHS[src].flatMap(([os, path]) => {
+    const copy = el("button", { className: "bp-path", textContent: path, title: "Click to copy" });
+    copy.onclick = () => copy.textContent === path && navigator.clipboard?.writeText(path).then(() => flash(copy, "Copied to clipboard"));
+    return [el("span", { className: "muted", textContent: os }), copy];
+  }));
+  $("#bp-ws").hidden = src !== "workshop";
+}
+function initBlueprints() {
+  const dlg = $("#bp"), file = $("#bp-file");
+  showPaths("saved");
+  document.querySelectorAll("[name=bp-src]").forEach((r) => (r.onchange = () => showPaths(r.value)));
+  $("#bp-open").onclick = () => dlg.showModal();
+  $("#bp-close").onclick = () => dlg.close();
+  $("#bp-pick").onclick = () => file.click();
+  file.onchange = () => { if (file.files[0]) loadBlueprint(file.files[0]); file.value = ""; };
+  // a copied file pastes as a file; a copied folder arrives as an unreadable entry
+  addEventListener("paste", (e) => {
+    const f = pickGrid(e.clipboardData?.files || []);
+    if (!f) return;
+    e.preventDefault();
+    /\.vrb$/i.test(f.name) ? loadBlueprint(f) : loadNote(["Not a blueprint file. Paste grid.json.vrb (folders can't be pasted)."], "bad");
+  });
+  // dragging files over the page shows the drop target. dragover repeats while hovering, so the target hides
+  // once it stops, however the drag ended (enter/leave pairs get lost when a drop lands in another window)
+  let dragTimer;
+  const files = (e) => e.dataTransfer.types.includes("Files");
+  addEventListener("dragover", (e) => {
+    if (!files(e)) return;
+    e.preventDefault();
+    $("#drop").hidden = false;
+    clearTimeout(dragTimer);
+    dragTimer = setTimeout(() => ($("#drop").hidden = true), 250);
+  });
+  // a dropped folder also gives us .container-info: the blueprint's name and its own block count
+  addEventListener("drop", (e) => {
+    if (!files(e)) return;
+    e.preventDefault();
+    clearTimeout(dragTimer);
+    $("#drop").hidden = true;
+    const entry = e.dataTransfer.items[0]?.webkitGetAsEntry?.();
+    if (!entry?.isDirectory) return loadBlueprint(pickGrid(e.dataTransfer.files));
+    const get = (name) => new Promise((ok) => entry.getFile(name, {}, (f) => f.file(ok, () => ok(null)), () => ok(null)));
+    Promise.all([get("grid.json.vrb"), get(".container-info")]).then(([grid, info]) => grid
+      ? loadBlueprint(grid, info)
+      : loadNote(["No grid.json.vrb in that folder."], "bad"));
+  });
+  $("#load-undo").onclick = () => {
+    sel.clear();
+    for (const [id, q] of beforeLoad) sel.set(id, q);
+    loadNote(null);
+    update();
+  };
+  $("#load-close").onclick = () => loadNote(null);
+}
+
+// several files at once (e.g. a blueprint folder's contents): use grid.json.vrb if it's among them
+const pickGrid = (files) => [...files].find((f) => f.name === "grid.json.vrb") || files[0];
+// the outcome of a load shows above the build list, one line per fact; Undo if a list was replaced
+let beforeLoad = null;
+const fail = (msg) => { throw Object.assign(new Error(msg), { name: "BlueprintError" }); };
+async function loadBlueprint(file, info) {
+  $("#bp").close();
+  try {
+    if (/^snapshot/i.test(file.name)) fail("That's the preview file. Pick grid.json.vrb.");
+    const { counts, grids } = await blueprintBlocks(new Uint8Array(await file.arrayBuffer()));
+    let meta = null;
+    try { meta = JSON.parse((await info.text()).replace(/^\uFEFF/, "")).$Value.Meta; } catch {} // optional: no info, no check
+    const found = [...counts.values()].reduce((s, n) => s + n, 0);
+    if (!found) fail("No blocks found in that file.");
+    beforeLoad = sel.size ? new Map(sel) : null;
+    sel.clear();
+    for (const [id, n] of counts) sel.set(id, n);
+    update();
+    const title = meta?.BaseMetadata?.Title, missing = (meta?.BlockCount || 0) - found, warn = [];
+    if (grids.length > 1) warn.push(`Multiple grids: ${grids.map(fmt).join(" + ")} blocks`, "Anything docked when it was saved is included.");
+    if (missing > 0) warn.push(`${fmt(missing)} blocks not in the planner (not counted)`);
+    loadNote([`Loaded ${fmt(found)} blocks${title ? ` · ${title}` : ""}`, ...warn], warn.length ? "warn" : "ok");
+  } catch (e) {
+    // sandboxed browsers (Flatpak, Snap) can't open dropped files outside the folders they're allowed; their file dialog can
+    loadNote([e.name === "BlueprintError" ? e.message
+      : e.name === "NotFoundError" || e.name === "NotReadableError" ? "Browser couldn't read that file. Use Load blueprint → Choose file."
+      : "Couldn't read that file. Pick grid.json.vrb."], "bad");
+  }
+}
+function loadNote(lines, kind) {
+  const n = $("#load-note");
+  n.hidden = !lines;
+  if (!lines) return void (beforeLoad = null);
+  n.className = "load-note " + kind;
+  n.querySelector(".lines").replaceChildren(...lines.map((t) => el("p", { textContent: t })));
+  $("#load-undo").hidden = kind === "bad" || !beforeLoad;
+  setView("plan");
+}
+
+// grid.json.vrb is a VR3B container; its data section is Brotli-compressed binary.
+// Header: u64 data offset at 0x84, u64 packed size at 0x94, u64 unpacked size at 0x9c, u32 compression at 0xa4
+// (0 = stored, 2 = Brotli; both seen across ~3000 save/blueprint files).
+async function blueprintBlocks(buf) {
+  const v = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  const comp = buf.length >= 0xc0 ? v.getUint32(0xa4, true) : -1;
+  if (String.fromCharCode(...buf.subarray(0, 4)) !== "VR3B" || (comp !== 0 && comp !== 2)) fail("Not an SE2 blueprint. Pick grid.json.vrb.");
+  const at = (o) => Number(v.getBigUint64(o, true));
+  const data = buf.subarray(at(0x84), at(0x84) + at(0x94));
+  const g = comp ? (await import("./vendor/brotli.js")).default(data, at(0x9c)) : data;
+  // each entity is 0x81, its composition GUID, then 00 <component count> 00 00: a grid, then the blocks on it.
+  // A grid whose first block is a piston/rotor/hinge head is that part's moving subgrid; any other grid is a separate structure.
+  const counts = new Map(), grids = [], gridKey = guidBytes(D.game.grid), heads = new Set(D.game.heads.map(guidBytes));
+  for (let i = g.indexOf(0x81); i >= 0 && i + 21 <= g.length; i = g.indexOf(0x81, i + 1)) {
+    if (g[i + 17] || !g[i + 18] || g[i + 19] || g[i + 20]) continue;
+    const key = String.fromCharCode(...g.subarray(i + 1, i + 17)), id = blockByEntity.get(key);
+    const gr = grids.at(-1);
+    if (key === gridKey) grids.push({ n: 0, head: null });
+    else if (gr && gr.head === null && (id || heads.has(key))) gr.head = heads.has(key); // (other hits are strings)
+    if (!id) continue;
+    counts.set(id, (counts.get(id) || 0) + 1);
+    if (gr) gr.n++;
+  }
+  return { counts, grids: grids.filter((x) => x.n && !x.head).map((x) => x.n) };
+}
+// GUID string -> its 16 bytes as .NET stores them (first three groups little-endian), as a string key
+function guidBytes(guid) {
+  const h = guid.replace(/-/g, "");
+  const order = [3, 2, 1, 0, 5, 4, 7, 6, 8, 9, 10, 11, 12, 13, 14, 15];
+  return String.fromCharCode(...order.map((i) => parseInt(h.substr(i * 2, 2), 16)));
 }
 
 // ---------- render ----------

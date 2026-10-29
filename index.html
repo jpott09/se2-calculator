@@ -17,7 +17,7 @@
   <span class="ribbon">ALPHA</span>
   <svg class="top-art" aria-hidden="true" viewBox="0 0 420 64" preserveAspectRatio="xMaxYMax meet"><path d="M0 63.5H40L62 41.5H420"/><path d="M180 0L243.5 63.5M214 0L256 42"/></svg>
   <div class="brand"><small>Space Engineers 2</small><h1>Build Planner</h1></div>
-  <button id="share" class="btn hot">Copy link</button>
+  <div class="top-btns"><button id="bp-open" class="btn">Load blueprint</button><button id="share" class="btn hot">Copy link</button></div>
 </header>
 
 <main class="layout">
@@ -48,6 +48,9 @@
           </div>
           <button id="clear" class="btn warn">Clear</button>
         </div>
+      </div>
+      <div id="load-note" class="load-note" role="status" hidden>
+        <div class="lines"></div><button id="load-undo" class="btn">Undo</button><button id="load-close" class="del" aria-label="Dismiss">×</button>
       </div>
       <p id="summary" class="muted summary"></p>
       <ul id="selection" class="selection"></ul>
@@ -109,6 +112,23 @@
   <button data-view="blocks">Blocks</button>
   <button data-view="plan">Plan <b id="tab-count" class="count"></b></button>
 </nav>
+<dialog id="bp" class="dlg" aria-labelledby="bp-title">
+  <h2 id="bp-title">Load blueprint</h2>
+  <div class="seg bp-src" role="radiogroup" aria-label="Blueprint source">
+    <label><input type="radio" name="bp-src" value="saved" checked><span>Your blueprints</span></label>
+    <label><input type="radio" name="bp-src" value="workshop"><span>Workshop</span></label>
+  </div>
+  <div id="bp-paths"></div>
+  <p id="bp-ws" class="muted" hidden>Folders are named by Workshop item ID (it's in the item's URL).</p>
+  <p>Paste the path into the file dialog, open your blueprint, pick <code>grid.json.vrb</code>.</p>
+  <p class="muted">Dropping or pasting it also works. Nothing is uploaded.</p>
+  <div class="dlg-btns">
+    <button id="bp-close" class="btn">Close</button>
+    <button id="bp-pick" class="btn hot">Choose file</button>
+  </div>
+  <input id="bp-file" type="file" accept=".vrb" hidden>
+</dialog>
+<div id="drop" class="drop" hidden><span>Drop to load blueprint</span></div>
 <div id="tip" class="tip" hidden></div>
 <script src="app.js"></script>
 </body>
