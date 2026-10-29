@@ -422,7 +422,8 @@ async function blueprintBlocks(buf) {
   if (String.fromCharCode(...buf.subarray(0, 4)) !== "VR3B" || (comp !== 0 && comp !== 2)) fail("Not an SE2 blueprint. Pick grid.json.vrb.");
   const at = (o) => Number(v.getBigUint64(o, true));
   const data = buf.subarray(at(0x84), at(0x84) + at(0x94));
-  const g = comp ? (await import("./vendor/brotli.js")).default(data, at(0x9c)) : data;
+  const decoder = comp && await import("./vendor/brotli.js").catch(() => fail("Couldn't load the blueprint decoder. Reload the page."));
+  const g = comp ? decoder.default(data, at(0x9c)) : data;
   // each entity is 0x81, its composition GUID, then 00 <component count> 00 00: a grid, then the blocks on it.
   // A grid whose first block is a piston/rotor/hinge head is that part's moving subgrid; any other grid is a separate structure.
   const counts = new Map(), grids = [], gridKey = guidBytes(D.game.grid), heads = new Set(D.game.heads.map(guidBytes));
